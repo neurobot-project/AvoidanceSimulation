@@ -24,7 +24,7 @@ def main():
     parser.add_argument('--weights', type=str)
     parser.add_argument('--resume', default=False, action='store_true')
     parser.add_argument('--gpu', default=False, action='store_true')
-    parser.add_argument('--debug', default=False, action='store_true')
+    parser.add_argument('--debug', default=True, action='store_true')
     args = parser.parse_args()
 
     # configure paths
@@ -101,37 +101,37 @@ def main():
     batch_size = train_config.getint('trainer', 'batch_size')
     trainer = SFTrainer(model, memory, device, batch_size)
     explorer = SFExplorer(env, robot, device, memory, policy.gamma, target_policy=policy)
-    explorer.update_target_model(model)
+    # explorer.update_target_model(model)
 
-    # # imitation learning
-    # if args.resume:
-    #     if not os.path.exists(rl_weight_file):
-    #         logging.error('RL weights does not exist')
-    #     model.load_state_dict(torch.load(rl_weight_file))
-    #     rl_weight_file = os.path.join(args.output_dir, 'resumed_rl_model.pth')
-    #     logging.info('Load reinforcement learning trained weights. Resume training')
-    # elif os.path.exists(il_weight_file):
-    #     model.load_state_dict(torch.load(il_weight_file))
-    #     logging.info('Load imitation learning trained weights.')
-    # else:
-    #     il_episodes = train_config.getint('imitation_learning', 'il_episodes')
-    #     il_policy = train_config.get('imitation_learning', 'il_policy')
-    #     il_epochs = train_config.getint('imitation_learning', 'il_epochs')
-    #     il_learning_rate = train_config.getfloat('imitation_learning', 'il_learning_rate')
-    #     trainer.set_learning_rate(il_learning_rate)
-    #     if robot.visible:
-    #         safety_space = 0
-    #     else:
-    #         safety_space = train_config.getfloat('imitation_learning', 'safety_space')
-    #     il_policy = policy_factory[il_policy]()
-    #     il_policy.multiagent_training = policy.multiagent_training
-    #     il_policy.safety_space = safety_space
-    #     robot.set_policy(il_policy)
-    #     explorer.run_k_episodes(il_episodes, 'train', update_memory=True, imitation_learning=False)
-    #     trainer.optimize_epoch(il_epochs)
-    #     torch.save(model.state_dict(), il_weight_file)
-    #     logging.info('Finish imitation learning. Weights saved.')
-    #     logging.info('Experience set size: %d/%d', len(memory), memory.capacity)
+    # imitation learning
+    if args.resume:
+        if not os.path.exists(rl_weight_file):
+            logging.error('RL weights does not exist')
+        model.load_state_dict(torch.load(rl_weight_file))
+        rl_weight_file = os.path.join(args.output_dir, 'resumed_rl_model.pth')
+        logging.info('Load reinforcement learning trained weights. Resume training')
+    elif os.path.exists(il_weight_file):
+        model.load_state_dict(torch.load(il_weight_file))
+        logging.info('Load imitation learning trained weights.')
+    else:
+        il_episodes = train_config.getint('imitation_learning', 'il_episodes')
+        il_policy = train_config.get('imitation_learning', 'il_policy')
+        il_epochs = train_config.getint('imitation_learning', 'il_epochs')
+        il_learning_rate = train_config.getfloat('imitation_learning', 'il_learning_rate')
+        trainer.set_learning_rate(il_learning_rate)
+        if robot.visible:
+            safety_space = 0
+        else:
+            safety_space = train_config.getfloat('imitation_learning', 'safety_space')
+        il_policy = policy_factory[il_policy]()
+        il_policy.multiagent_training = policy.multiagent_training
+        il_policy.safety_space = safety_space
+        robot.set_policy(il_policy)
+        explorer.run_k_episodes(il_episodes, 'train', update_memory=True, imitation_learning=True)
+        trainer.optimize_epoch(il_epochs)
+        torch.save(model.state_dict(), il_weight_file)
+        logging.info('Finish imitation learning. Weights saved.')
+        logging.info('Experience set size: %d/%d', len(memory), memory.capacity)
     explorer.update_target_model(model)
 
     # reinforcement learning
@@ -142,8 +142,8 @@ def main():
     # fill the memory pool with some RL experience
     # if args.resume:
     robot.policy.set_epsilon(epsilon_end)
-    explorer.run_k_episodes(50, 'train', update_memory=True, episode=0)
-    logging.info('Experience set size: %d/%d', len(memory), memory.capacity)
+    # explorer.run_k_episodes(50, 'train', update_memory=True, episode=0)
+    # logging.info('Experience set size: %d/%d', len(memory), memory.capacity)
     episode = 0
     while episode < train_episodes:
         if args.resume:

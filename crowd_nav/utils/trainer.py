@@ -99,20 +99,34 @@ class SFTrainer(object):
         average_epoch_loss = 0
         for epoch in range(num_epochs):
             epoch_loss = 0
+            w_losses = []
             for data in self.data_loader:
-                inputs, values = data
-                inputs = Variable(inputs)
-                values = Variable(values)
+                states, sf_values, actions, next_states, rewards = data
+                states = Variable(states)
+                sf_values = Variable(sf_values)
 
                 self.optimizer.zero_grad()
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, values)
+                outputs = self.model(states)
+                loss = self.criterion(outputs, sf_values)
+                if torch.sum(torch.isnan(loss)):
+                    print(data)
+                    print("NaN detected!: epoch opt :: "+str(epoch))
                 loss.backward()
                 self.optimizer.step()
                 epoch_loss += loss.data.item()
 
+                w_vec = self.model.w_vec.detach().cpu().numpy().reshape(-1)
+                phis = states.detach().cpu().numpy()
+                r_loss = rewards.detach().cpu().numpy().reshape(-1) - np.matmul(phis, w_vec)
+                w_loss = np.mean(np.multiply(r_loss.reshape(-1, 1), phis), axis=0)
+                w_vec = w_vec + self.w_lr*w_loss
+                self.model.w_vec = torch.tensor(w_vec.reshape(1, -1))
+                w_losses.append(np.mean(w_loss))
+            
+            # print(outputs)
             average_epoch_loss = epoch_loss / len(self.memory)
             logging.debug('Average loss in epoch %d: %.2E', epoch, average_epoch_loss)
+            logging.debug('Average w loss in epoch %d: %.2E', epoch, np.mean(np.array(w_losses)))
 
         return average_epoch_loss
 
@@ -134,6 +148,8 @@ class SFTrainer(object):
             self.optimizer.zero_grad()
             outputs = self.model(states)
             loss = self.criterion(outputs, sf_values)
+            if torch.sum(torch.isnan(loss)):
+                print("NaN detected!: epoch opt :: "+str(epoch))
             loss.backward()
             self.optimizer.step()
             losses += loss.data.item()
@@ -146,7 +162,8 @@ class SFTrainer(object):
             self.model.w_vec = torch.tensor(w_vec.reshape(1, -1))
             w_losses += np.mean(w_losses)
             # print(loss.data.item())
-
+        
+        # print(outputs)
         average_loss = losses / num_batches
         average_w_loss = w_losses / num_batches
         logging.debug('Average loss : %.2E', average_loss)

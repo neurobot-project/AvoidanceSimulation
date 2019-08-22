@@ -24,7 +24,7 @@ def main():
     parser.add_argument('--weights', type=str)
     parser.add_argument('--resume', default=False, action='store_true')
     parser.add_argument('--gpu', default=False, action='store_true')
-    parser.add_argument('--debug', default=False, action='store_true')
+    parser.add_argument('--debug', default=True, action='store_true')
     args = parser.parse_args()
 
     # configure paths

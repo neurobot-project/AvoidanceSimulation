@@ -161,6 +161,7 @@ class SFExplorer(object):
             rewards = []
             while not done:
                 action = self.robot.act(ob)
+                
                 ob, reward, done, info = self.env.step(action)
                 states.append(self.robot.policy.last_state)
                 actions.append(action)
@@ -218,16 +219,30 @@ class SFExplorer(object):
         for i, state in enumerate(states):
             reward = torch.Tensor([rewards[i]]).to(self.device)
             action = actions[i]
-            if i == len(states) - 1:
-                # terminal state
-                next_state = state.clone()
-                sf_value = state.clone()
-            else:
-                next_state = states[i + 1]
-                gamma_bar = pow(self.gamma, self.robot.time_step * self.robot.v_pref)
-                # next_state.unsqueeze(0)
-                sf_value = state + gamma_bar * self.target_model(next_state)
+
+            # VALUE UPDATE
+            if imitation_learning:
+                # define the value of states in IL as cumulative discounted rewards, which is the same in RL
+                if i == len(states) - 1:
+                    # terminal state
+                    next_state = self.target_policy.transform(state).clone()
+                else:
+                    next_state = self.target_policy.transform(states[i + 1])
+                state = self.target_policy.transform(state)
+                sf_value = sum([pow(self.gamma, max(t - i, 0) * self.robot.time_step * self.robot.v_pref) * self.target_policy.transform(_state)
+                             * (1 if t >= i else 0) for t, _state in enumerate(states)])
                 sf_value = torch.squeeze(sf_value)
+            else:
+                if i == len(states) - 1:
+                    # terminal state
+                    next_state = state.clone()
+                    sf_value = state.clone()
+                else:
+                    next_state = states[i + 1]
+                    gamma_bar = pow(self.gamma, self.robot.time_step * self.robot.v_pref)
+                    # next_state.unsqueeze(0)
+                    sf_value = state + gamma_bar * self.target_model(next_state)
+                    sf_value = torch.squeeze(sf_value)
             # value = torch.Tensor([value]).to(self.device)
 
             # # transform state of different human_num into fixed-size tensor

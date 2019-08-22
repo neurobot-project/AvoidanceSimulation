@@ -171,6 +171,7 @@ class CADRL_SF(Policy):
         
         if self.phase == 'train':
             self.last_state = self.transform(state)
+        # print("max action: ", max_action)
 
         return max_action
 
